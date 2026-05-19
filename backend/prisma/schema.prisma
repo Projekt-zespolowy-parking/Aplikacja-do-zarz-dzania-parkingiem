@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum SpotStatus {
+  FREE
+  OCCUPIED
+  RESERVED
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CANCELLED
+  FINISHED
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  name         String
+  email        String        @unique
+  password     String
+  role         UserRole      @default(USER)
+  reservations Reservation[]
+  createdAt    DateTime      @default(now())
+}
+
+model ParkingSpot {
+  id           Int           @id @default(autoincrement())
+  number       String        @unique
+  level        Int
+  type         String        @default("STANDARD")
+  status       SpotStatus    @default(FREE)
+  reservations Reservation[]
+  createdAt    DateTime      @default(now())
+}
+
+model Reservation {
+  id            Int               @id @default(autoincrement())
+  userId        Int
+  parkingSpotId Int
+  startTime     DateTime
+  endTime       DateTime
+  status        ReservationStatus @default(ACTIVE)
+
+  user          User              @relation(fields: [userId], references: [id])
+  parkingSpot   ParkingSpot       @relation(fields: [parkingSpotId], references: [id])
+
+  createdAt     DateTime          @default(now())
+}

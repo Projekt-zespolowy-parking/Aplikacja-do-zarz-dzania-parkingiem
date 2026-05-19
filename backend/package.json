@@ -1,0 +1,24 @@
+{
+  "name": "parking-app-backend",
+  "version": "1.0.0",
+  "description": "Backend aplikacji do zarzadzania parkingiem",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "seed": "node prisma/seed.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "cors": "latest",
+    "dotenv": "latest",
+    "express": "latest",
+    "prisma": "^6.19.3"
+  },
+  "devDependencies": {
+    "nodemon": "latest"
+  }
+}
