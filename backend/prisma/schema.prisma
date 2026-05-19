@@ -7,53 +7,52 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  USER
+enum Rola {
   ADMIN
+  PROWADZACY
+  STUDENT
 }
 
-enum SpotStatus {
-  FREE
-  OCCUPIED
-  RESERVED
+enum StatusMiejsca {
+  WOLNY
+  ZAJETY
+  ZAREZERWOWANY
 }
 
-enum ReservationStatus {
-  ACTIVE
-  CANCELLED
-  FINISHED
+enum TypMiejsca {
+  STANDARD
+  DLA_PROWADZACEGO
+  NIEPELNOSPRAWNY
 }
 
 model User {
   id           Int           @id @default(autoincrement())
-  name         String
-  email        String        @unique
-  password     String
-  role         UserRole      @default(USER)
-  reservations Reservation[]
-  createdAt    DateTime      @default(now())
+  imie          String
+  email         String        @unique
+  haslo         String
+  rola          Rola          @default(STUDENT)
+  reservations  Reservation[]
+  createdAt     DateTime      @default(now())
 }
 
 model ParkingSpot {
-  id           Int           @id @default(autoincrement())
-  number       String        @unique
-  level        Int
-  type         String        @default("STANDARD")
-  status       SpotStatus    @default(FREE)
+  id           Int             @id @default(autoincrement())
+  numer        String          @unique
+  poziom       Int
+  typ          TypMiejsca
+  status       StatusMiejsca   @default(WOLNY)
   reservations Reservation[]
-  createdAt    DateTime      @default(now())
 }
 
 model Reservation {
-  id            Int               @id @default(autoincrement())
+  id            Int           @id @default(autoincrement())
   userId        Int
   parkingSpotId Int
-  startTime     DateTime
-  endTime       DateTime
-  status        ReservationStatus @default(ACTIVE)
+  dataOd        DateTime
+  dataDo        DateTime
 
-  user          User              @relation(fields: [userId], references: [id])
-  parkingSpot   ParkingSpot       @relation(fields: [parkingSpotId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+  parkingSpot   ParkingSpot   @relation(fields: [parkingSpotId], references: [id])
 
-  createdAt     DateTime          @default(now())
+  createdAt     DateTime      @default(now())
 }
