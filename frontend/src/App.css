@@ -91,10 +91,14 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 24px;
 }
 
 .header h1 {
   margin: 0;
+  font-size: 42px;
+  line-height: 1.05;
+  white-space: nowrap;
 }
 
 .header p {
@@ -106,6 +110,7 @@ button {
   display: grid;
   gap: 5px;
   text-align: right;
+  min-width: 180px;
 }
 
 .user-box span {
@@ -117,6 +122,16 @@ button {
   border-radius: 8px;
   background: white;
   color: #111827;
+  font-weight: bold;
+}
+
+.toast {
+  margin: 18px 36px 0;
+  padding: 14px 18px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-left: 6px solid #2563eb;
+  border-radius: 12px;
   font-weight: bold;
 }
 
@@ -153,20 +168,28 @@ button {
 
 .map-panel,
 .details-panel,
-.admin-panel {
+.admin-panel,
+.reservations-panel {
   background: white;
   border-radius: 18px;
   padding: 24px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.08);
 }
 
+.map-panel h2,
+.details-panel h2 {
+  margin-top: 0;
+  color: #111827;
+}
+
 .parking-map {
   position: relative;
-  height: 560px;
+  height: 660px;
   background: #cbd5e1;
   border: 6px solid #475569;
   border-radius: 18px;
   overflow: hidden;
+  padding: 0 30px;
 }
 
 .road {
@@ -179,6 +202,7 @@ button {
   padding: 24px 30px;
   font-weight: bold;
   letter-spacing: 2px;
+  text-align: center;
 }
 
 .road.top {
@@ -192,7 +216,7 @@ button {
 .building {
   position: absolute;
   left: 50%;
-  top: 220px;
+  top: 300px;
   transform: translateX(-50%);
   width: 250px;
   height: 110px;
@@ -205,31 +229,34 @@ button {
   font-size: 44px;
   font-weight: bold;
   letter-spacing: 5px;
+  z-index: 2;
 }
 
 .spots-row {
   position: absolute;
-  left: 30px;
-  right: 30px;
+  left: 34px;
+  right: 34px;
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(5, minmax(74px, 1fr));
+  gap: 12px;
+  z-index: 3;
 }
 
 .row-top {
-  top: 95px;
+  top: 100px;
 }
 
 .row-bottom {
-  bottom: 95px;
+  bottom: 100px;
 }
 
 .spot {
-  height: 100px;
+  height: 86px;
   border: 3px solid white;
   border-radius: 12px;
   font-size: 14px;
   transition: 0.2s;
+  padding: 8px;
 }
 
 .spot:hover {
@@ -321,7 +348,8 @@ button {
   color: #64748b;
 }
 
-.admin-panel {
+.admin-panel,
+.reservations-panel {
   margin: 0 36px 36px;
 }
 
@@ -344,7 +372,7 @@ button {
 
 .admin-row {
   display: grid;
-  grid-template-columns: 1fr 2fr 2fr 100px;
+  grid-template-columns: 1fr 2fr 2fr 140px;
   gap: 12px;
   align-items: center;
   background: #f8fafc;
@@ -368,6 +396,42 @@ button {
   background: #b91c1c;
 }
 
+.reservation-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.reservation-card {
+  background: #f8fafc;
+  border-left: 6px solid #2563eb;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.reservation-card div {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.reservation-card strong {
+  font-size: 22px;
+}
+
+.reservation-card span {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.reservation-card p {
+  margin: 7px 0;
+}
+
+.admin-reservation {
+  border-left-color: #f59e0b;
+}
+
 @media (max-width: 1000px) {
   .layout,
   .stats,
@@ -376,16 +440,32 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .spots-row {
-    grid-template-columns: repeat(5, 1fr);
-  }
-
   .header {
     display: grid;
     gap: 16px;
   }
 
+  .header h1 {
+    font-size: 34px;
+  }
+
   .user-box {
     text-align: left;
+  }
+}
+
+@media (max-width: 700px) {
+  .spots-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .parking-map {
+    height: 900px;
+  }
+
+  .building {
+    top: 410px;
+    width: 210px;
+    font-size: 36px;
   }
 }
