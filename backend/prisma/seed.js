@@ -32,7 +32,7 @@ async function main() {
 
   await prisma.user.create({
     data: {
-      imie: "Prowadzacy",
+      imie: "Prowadzący",
       email: "teacher@wspa.pl",
       haslo: teacherPassword,
       rola: "PROWADZACY",
@@ -41,11 +41,20 @@ async function main() {
 
   const miejsca = [];
 
-  for (let i = 1; i <= 20; i++) {
+  for (let i = 1; i <= 5; i++) {
+    miejsca.push({
+      numer: `P-${i}`,
+      poziom: 0,
+      typ: "DLA_PROWADZACEGO",
+      status: "WOLNY",
+    });
+  }
+
+  for (let i = 1; i <= 15; i++) {
     miejsca.push({
       numer: `A-${i}`,
       poziom: 0,
-      typ: i <= 5 ? "DLA_PROWADZACEGO" : "STANDARD",
+      typ: "STANDARD",
       status: "WOLNY",
     });
   }
@@ -54,11 +63,14 @@ async function main() {
     data: miejsca,
   });
 
-  console.log("Seed zakończony");
+  console.log("Seed zakończony: dodano użytkowników i 20 miejsc parkingowych WSPA.");
 }
 
 main()
-  .catch((e) => console.error(e))
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
   .finally(async () => {
     await prisma.$disconnect();
   });

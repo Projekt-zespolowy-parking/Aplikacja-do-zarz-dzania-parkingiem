@@ -27,12 +27,12 @@ enum TypMiejsca {
 
 model User {
   id           Int           @id @default(autoincrement())
-  imie          String
-  email         String        @unique
-  haslo         String
-  rola          Rola          @default(STUDENT)
-  reservations  Reservation[]
-  createdAt     DateTime      @default(now())
+  imie         String
+  email        String        @unique
+  haslo        String
+  rola         Rola          @default(STUDENT)
+  reservations Reservation[]
+  createdAt    DateTime      @default(now())
 }
 
 model ParkingSpot {
@@ -45,14 +45,15 @@ model ParkingSpot {
 }
 
 model Reservation {
-  id            Int           @id @default(autoincrement())
-  userId        Int
-  parkingSpotId Int
-  dataOd        DateTime
-  dataDo        DateTime
+  id                 Int         @id @default(autoincrement())
+  userId             Int
+  parkingSpotId      Int
+  dataOd             DateTime
+  dataDo             DateTime
+  numerRejestracyjny String
 
-  user          User          @relation(fields: [userId], references: [id])
-  parkingSpot   ParkingSpot   @relation(fields: [parkingSpotId], references: [id])
+  user               User        @relation(fields: [userId], references: [id])
+  parkingSpot        ParkingSpot @relation(fields: [parkingSpotId], references: [id])
 
-  createdAt     DateTime      @default(now())
+  createdAt          DateTime    @default(now())
 }

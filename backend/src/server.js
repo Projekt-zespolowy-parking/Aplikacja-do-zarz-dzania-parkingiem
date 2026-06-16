@@ -11,15 +11,26 @@ app.use(cors());
 app.use(express.json());
 
 const JWT_SECRET = process.env.JWT_SECRET || "WSPA_SECRET";
+const MAX_RESERVATION_HOURS = 24;
+const MAX_DAYS_AHEAD = 3;
+
+function getNow() {
+  return new Date();
+}
+
+function getMaxReservationStartDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + MAX_DAYS_AHEAD);
+  return date;
+}
 
 app.get("/", (req, res) => {
   res.json({
     message: "Parking WSPA API działa",
-    endpoints: ["/api/login", "/api/spots", "/api/reservations"],
+    endpoints: ["/api/login", "/api/spots", "/api/reservations", "/api/admin/stats"],
   });
 });
 
-// LOGOWANIE
 app.post("/api/login", async (req, res) => {
   try {
     const { email, haslo } = req.body;
@@ -39,10 +50,7 @@ app.post("/api/login", async (req, res) => {
     }
 
     const token = jwt.sign(
-      {
-        id: user.id,
-        rola: user.rola,
-      },
+      { id: user.id, rola: user.rola },
       JWT_SECRET,
       { expiresIn: "8h" }
     );
@@ -62,12 +70,22 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// LISTA MIEJSC
 app.get("/api/spots", async (req, res) => {
   try {
+    const now = getNow();
+
     const spots = await prisma.parkingSpot.findMany({
       include: {
-        reservations: true,
+        reservations: {
+          where: {
+            dataDo: {
+              gt: now,
+            },
+          },
+          orderBy: {
+            dataOd: "asc",
+          },
+        },
       },
       orderBy: {
         id: "asc",
@@ -81,7 +99,6 @@ app.get("/api/spots", async (req, res) => {
   }
 });
 
-// DODAWANIE MIEJSCA
 app.post("/api/spots", async (req, res) => {
   try {
     const { numer, poziom, typ } = req.body;
@@ -89,6 +106,12 @@ app.post("/api/spots", async (req, res) => {
     if (!numer || poziom === undefined || !typ) {
       return res.status(400).json({
         message: "Uzupełnij numer, poziom i typ miejsca",
+      });
+    }
+
+    if (!["STANDARD", "DLA_PROWADZACEGO"].includes(typ)) {
+      return res.status(400).json({
+        message: "Nieprawidłowy typ miejsca",
       });
     }
 
@@ -118,16 +141,19 @@ app.post("/api/spots", async (req, res) => {
   }
 });
 
-// EDYCJA MIEJSCA
 app.put("/api/spots/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { status, typ, numer, poziom } = req.body;
 
+    if (typ && !["STANDARD", "DLA_PROWADZACEGO"].includes(typ)) {
+      return res.status(400).json({
+        message: "Nieprawidłowy typ miejsca",
+      });
+    }
+
     const spot = await prisma.parkingSpot.update({
-      where: {
-        id: Number(id),
-      },
+      where: { id: Number(id) },
       data: {
         ...(status ? { status } : {}),
         ...(typ ? { typ } : {}),
@@ -143,49 +169,53 @@ app.put("/api/spots/:id", async (req, res) => {
   }
 });
 
-// USUWANIE MIEJSCA PARKINGOWEGO
 app.delete("/api/spots/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
     await prisma.reservation.deleteMany({
-      where: {
-        parkingSpotId: Number(id),
-      },
+      where: { parkingSpotId: Number(id) },
     });
 
     await prisma.parkingSpot.delete({
-      where: {
-        id: Number(id),
-      },
+      where: { id: Number(id) },
     });
 
-    res.json({
-      message: "Miejsce zostało usunięte",
-    });
+    res.json({ message: "Miejsce zostało usunięte" });
   } catch (error) {
     console.error("Błąd usuwania miejsca:", error);
     res.status(500).json({ message: "Nie udało się usunąć miejsca" });
   }
 });
 
-// TWORZENIE REZERWACJI
 app.post("/api/reservations", async (req, res) => {
   try {
-    const { userId, parkingSpotId, dataOd, dataDo } = req.body;
+    const { userId, parkingSpotId, dataOd, dataDo, numerRejestracyjny } = req.body;
 
-    if (!userId || !parkingSpotId || !dataOd || !dataDo) {
+    if (!userId || !parkingSpotId || !dataOd || !dataDo || !numerRejestracyjny) {
       return res.status(400).json({
-        message: "Uzupełnij wszystkie dane rezerwacji",
+        message: "Uzupełnij datę, godzinę oraz numer rejestracyjny pojazdu",
       });
     }
 
     const start = new Date(dataOd);
     const end = new Date(dataDo);
+    const now = getNow();
+    const maxStartDate = getMaxReservationStartDate();
 
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return res.status(400).json({ message: "Nieprawidłowy format daty" });
+    }
+
+    if (start < now) {
       return res.status(400).json({
-        message: "Nieprawidłowy format daty",
+        message: "Nie można utworzyć rezerwacji w przeszłości",
+      });
+    }
+
+    if (start > maxStartDate) {
+      return res.status(400).json({
+        message: "Rezerwację można utworzyć maksymalnie 3 dni do przodu",
       });
     }
 
@@ -195,16 +225,20 @@ app.post("/api/reservations", async (req, res) => {
       });
     }
 
+    const durationHours = (end - start) / (1000 * 60 * 60);
+
+    if (durationHours > MAX_RESERVATION_HOURS) {
+      return res.status(400).json({
+        message: "Maksymalny czas rezerwacji to 24 godziny",
+      });
+    }
+
     const miejsce = await prisma.parkingSpot.findUnique({
-      where: {
-        id: Number(parkingSpotId),
-      },
+      where: { id: Number(parkingSpotId) },
     });
 
     const user = await prisma.user.findUnique({
-      where: {
-        id: Number(userId),
-      },
+      where: { id: Number(userId) },
     });
 
     if (!miejsce || !user) {
@@ -221,7 +255,7 @@ app.post("/api/reservations", async (req, res) => {
 
     if (miejsce.typ === "DLA_PROWADZACEGO" && user.rola === "STUDENT") {
       return res.status(403).json({
-        message: "Student nie może rezerwować miejsca dla prowadzących",
+        message: "To miejsce jest przeznaczone dla prowadzących",
       });
     }
 
@@ -245,6 +279,7 @@ app.post("/api/reservations", async (req, res) => {
         parkingSpotId: Number(parkingSpotId),
         dataOd: start,
         dataDo: end,
+        numerRejestracyjny: numerRejestracyjny.trim().toUpperCase(),
       },
       include: {
         user: true,
@@ -258,13 +293,10 @@ app.post("/api/reservations", async (req, res) => {
     });
   } catch (error) {
     console.error("Błąd rezerwacji:", error);
-    res.status(500).json({
-      message: "Błąd serwera podczas tworzenia rezerwacji",
-    });
+    res.status(500).json({ message: "Błąd serwera podczas tworzenia rezerwacji" });
   }
 });
 
-// LISTA WSZYSTKICH REZERWACJI — DLA ADMINA
 app.get("/api/reservations", async (req, res) => {
   try {
     const reservations = await prisma.reservation.findMany({
@@ -284,21 +316,14 @@ app.get("/api/reservations", async (req, res) => {
   }
 });
 
-// REZERWACJE KONKRETNEGO UŻYTKOWNIKA
 app.get("/api/users/:userId/reservations", async (req, res) => {
   try {
     const { userId } = req.params;
 
     const reservations = await prisma.reservation.findMany({
-      where: {
-        userId: Number(userId),
-      },
-      include: {
-        parkingSpot: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
+      where: { userId: Number(userId) },
+      include: { parkingSpot: true },
+      orderBy: { createdAt: "desc" },
     });
 
     res.json(reservations);
@@ -308,37 +333,130 @@ app.get("/api/users/:userId/reservations", async (req, res) => {
   }
 });
 
-// ANULOWANIE REZERWACJI — NIE USUWA MIEJSCA PARKINGOWEGO
 app.delete("/api/reservations/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
     const reservation = await prisma.reservation.findUnique({
-      where: {
-        id: Number(id),
-      },
+      where: { id: Number(id) },
     });
 
     if (!reservation) {
-      return res.status(404).json({
-        message: "Nie znaleziono rezerwacji",
-      });
+      return res.status(404).json({ message: "Nie znaleziono rezerwacji" });
     }
 
     await prisma.reservation.delete({
-      where: {
-        id: Number(id),
+      where: { id: Number(id) },
+    });
+
+    res.json({ message: "Rezerwacja została anulowana" });
+  } catch (error) {
+    console.error("Błąd anulowania rezerwacji:", error);
+    res.status(500).json({ message: "Nie udało się anulować rezerwacji" });
+  }
+});
+
+app.get("/api/admin/stats", async (req, res) => {
+  try {
+    const spots = await prisma.parkingSpot.findMany({
+      include: { reservations: true },
+      orderBy: { id: "asc" },
+    });
+
+    const reservations = await prisma.reservation.findMany({
+      include: {
+        parkingSpot: true,
+        user: true,
+      },
+      orderBy: {
+        createdAt: "desc",
       },
     });
 
+    const now = getNow();
+
+    const stats = spots.map((spot) => {
+      const totalReservations = spot.reservations.length;
+      const activeReservations = spot.reservations.filter(
+        (reservation) => new Date(reservation.dataDo) > now
+      ).length;
+
+      const reservedHours = spot.reservations.reduce((sum, reservation) => {
+        const start = new Date(reservation.dataOd);
+        const end = new Date(reservation.dataDo);
+        const hours = Math.max(0, (end - start) / (1000 * 60 * 60));
+        return sum + hours;
+      }, 0);
+
+      return {
+        parkingSpotId: spot.id,
+        numer: spot.numer,
+        typ: spot.typ,
+        status: spot.status,
+        totalReservations,
+        activeReservations,
+        reservedHours: Number(reservedHours.toFixed(2)),
+      };
+    });
+
+    const vehiclesMap = new Map();
+
+    reservations.forEach((reservation) => {
+      const plate = reservation.numerRejestracyjny || "BRAK";
+      const current = vehiclesMap.get(plate) || {
+        numerRejestracyjny: plate,
+        totalReservations: 0,
+        activeReservations: 0,
+        reservedHours: 0,
+        places: new Set(),
+        users: new Set(),
+      };
+
+      const start = new Date(reservation.dataOd);
+      const end = new Date(reservation.dataDo);
+      const hours = Math.max(0, (end - start) / (1000 * 60 * 60));
+
+      current.totalReservations += 1;
+      current.reservedHours += hours;
+      current.places.add(reservation.parkingSpot?.numer || "brak");
+      current.users.add(reservation.user?.email || "brak");
+
+      if (end > now) {
+        current.activeReservations += 1;
+      }
+
+      vehiclesMap.set(plate, current);
+    });
+
+    const vehicleStats = Array.from(vehiclesMap.values()).map((item) => ({
+      numerRejestracyjny: item.numerRejestracyjny,
+      totalReservations: item.totalReservations,
+      activeReservations: item.activeReservations,
+      reservedHours: Number(item.reservedHours.toFixed(2)),
+      places: Array.from(item.places),
+      users: Array.from(item.users),
+    }));
+
+    const totalReservations = stats.reduce(
+      (sum, item) => sum + item.totalReservations,
+      0
+    );
+
+    const totalReservedHours = stats.reduce(
+      (sum, item) => sum + item.reservedHours,
+      0
+    );
+
     res.json({
-      message: "Rezerwacja została anulowana",
+      totalSpots: spots.length,
+      totalReservations,
+      totalReservedHours: Number(totalReservedHours.toFixed(2)),
+      stats,
+      vehicleStats,
     });
   } catch (error) {
-    console.error("Błąd anulowania rezerwacji:", error);
-    res.status(500).json({
-      message: "Nie udało się anulować rezerwacji",
-    });
+    console.error("Błąd statystyk:", error);
+    res.status(500).json({ message: "Błąd pobierania statystyk" });
   }
 });
 
